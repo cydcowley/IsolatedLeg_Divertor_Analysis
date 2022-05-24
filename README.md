@@ -1,4 +1,4 @@
-# IsolatedLeg_Divertor_Analysis
+# Detachment Control Routine
 Repository of python scripts used to generate figures for the paper 'Optimizing Detachment Control Using the Magnetic Configuration of Divertors'. 
 
 All simulation data for this paper can be found on the UKAEA cluster Freia, under /projects/physics/SOLPS/ccowley. For access, please contact the head of tokamak science data at CCFE. 
