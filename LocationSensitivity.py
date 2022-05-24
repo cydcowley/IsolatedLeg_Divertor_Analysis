@@ -12,10 +12,8 @@ from scipy.integrate import quad,trapz, cumtrapz, odeint, solve_ivp
 from PIL import Image
 import cv2
 import glob
-import mpltools
-from mpltools import special
 import sys
-from parse import parse
+
 sys.path.append('D:\\my stuff\\PhD\\Theoretical_Detachment_Control_Scripts')
 from LipschultzDLS import ChInt,ChIntThermalForce,averageB
 from UnpackSOLPS import unpackSOLPS,SOLring
@@ -39,7 +37,7 @@ colors = ["#356288","#fe1100","#aacfdd","#fe875d"]
 
 def determineC0(Spar,C):
     for k in range(len(C)):
-        if Spar[k] > Spar[-1]/100:
+        if Spar[k] > 0:
 
             return k-1
 
@@ -48,8 +46,8 @@ def scanThresholds(routine,plotspace):
     folderList = []
     if routine=="Flaring":
         folderList = [
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentNoBulge_Lpar20\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb",
+        "balFiles\\noFlare\\",
+        "balFiles\\Flare\\",
         # "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentNoBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb",
         # "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb",
         ]
@@ -62,15 +60,15 @@ def scanThresholds(routine,plotspace):
         ]
     if routine == "GradB" or routine == "GradBSensitivity" or routine == "GradBAbsolute":
         folderList = [
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle90\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb_v0BC",
+        "balFiles\L1_Angle90",
         # "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0\ImpurityScanqpll5E7ne1E19_NoFluxLim_noDiff",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb"
+        "balFiles\L1_Angle0"
         ]
     if routine == "Different C":
         folderList = [
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle90\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb_v0BC",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle90\powerScanne1E19fi17E-3_Ncooling",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle90\DensityScanqpll5E7fi17E-3_Ncooling"
+        "balFiles\L1_Angle90",
+        "balFiles\L1_Angle90Power",
+        "balFiles\L1_Angle90Density"
         ]
         
     reverse = -1
@@ -83,12 +81,15 @@ def scanThresholds(routine,plotspace):
     FlaringPitch = []
     FlaringDistance = []
     for folder in folderList:
+
         Files = os.listdir(str(folder))
         Files = natsorted(Files)
 
-        if "powerScan" in folder:
+        if "Power" in folder:
             Files = Files[::-1]
         C = []
+        Ccalcs = []
+        
         Sh = []
         Sherr = []
         Bt = []
@@ -101,7 +102,6 @@ def scanThresholds(routine,plotspace):
 
             fileName = str(folder)+"/"+str(File)+"/" + str("balance.nc")
             rootgrp = Dataset(str(fileName), "r", format="NETCDF4")
-            # print(rootgrp)
             Xpoint = -1
             SOLring1 = 0
             RING = 14
@@ -120,6 +120,7 @@ def scanThresholds(routine,plotspace):
                 Sherr.append([pos-lower,upper-pos])
             # calculate the control parameter for this SOL ring
             C.append(SOLring1.determineC())
+            Ccalcs.append(SOLring1.returnCalculationsC(0))
             N0RAD.append(np.sqrt(trapz(SOLring1.qf,SOLring1.Spar)/trapz(SOLring1.qf/SOLring1.ne**2,SOLring1.Spar)))
 
 
@@ -131,8 +132,8 @@ def scanThresholds(routine,plotspace):
             prevFile = File
                 # plt.plot(SOLring1.Spar,SOLring1.ne)
                 # plt.show()
-        print(threshFile)
-        quantities2d,SOLring1 = unpackSOLPS(str(folder)+"/"+str(threshFile)+"/" + str("balance.nc"), reverse,RING)
+
+        quantities2d,SOLring1 = unpackSOLPS(str(folder)+"/"+str(File)+"/" + str("balance.nc"), reverse,RING)
         FlaringDistance.append(SOLring1.Spol)
         FlaringPitch.append(SOLring1.Bpol/SOLring1.B)
 
@@ -148,17 +149,10 @@ def scanThresholds(routine,plotspace):
         #determine the detachment threshold of the data
 
         index0 = determineC0(np.array(Sh)-np.array(Sherr)[:,0],C)
-        print(index0)
         Cplot = C[index0:]
-        print(len(Cplot))
         Splot = Sh[index0:]
         SplotErr =Sherr[index0:]
-        # print(index0)
-        # for i in range(len(C)):
-        #     if Sh[i] >= 1.001*Sh[index0]:
-        #         Cplot.append(C[i])
-        #         Splot.append(Sh[i])
-        #         SplotErr.append(Sh[:,1][i])
+
         Cplot = np.array(Cplot)
         Splot =np.array(Splot)
         SplotErr = np.array(SplotErr)
@@ -174,13 +168,13 @@ def scanThresholds(routine,plotspace):
         else:
             label = r"$C_{f,SOLPS}$"+" vertical"
         Ct = (C[index0])
-
         Ctplusone = C[index0+1]
         xerr = C/Ct-C/Ctplusone
         for i in range(0,index0+1):
             Sherr[i] = [0,0]
 
         SHSIMPLE = 0
+        Ccalcs = np.array(Ccalcs)
         if routine=="Flaring":
             SHSIMPLE =np.linspace(0.1,12,20)
             if counter==0:
@@ -188,7 +182,7 @@ def scanThresholds(routine,plotspace):
             else:
                 plt.errorbar(C/Ct,Sh,xerr=[xerr,xerr*0],yerr=np.transpose(np.array(Sherr)),linestyle = "",marker = "s",label="Flared SOLPS",color="#095169")
         if routine=="FlaringAll":
-            print(Ct)
+
             SHSIMPLE =np.linspace(0.1,12,20)
             label = ""
             if counter ==0:
@@ -207,6 +201,7 @@ def scanThresholds(routine,plotspace):
         if routine == "GradB" :
             SHSIMPLE =np.linspace(0.1,8,20)
             if counter==0:
+                # plt.plot((Ccalcs[:,2]/Ccalcs[:,2][index0]),Sh,label="Horizontal DLS",linestyle="--",color = "#F96E46",linewidth = 2)
                 plt.errorbar(C/Ct,Sh,xerr=[xerr,xerr*0],yerr=np.transpose(np.array(Sherr)),linestyle = "",marker = "o",label="Horizontal SOLPS",color ="#53ba83")
             else:
                 plt.errorbar(C/Ct,Sh,xerr=[xerr,xerr*0],yerr=np.transpose(np.array(Sherr)),linestyle = "",marker = "s",label="Vertical SOLPS",color="#0c0636")
@@ -249,7 +244,7 @@ def scanThresholds(routine,plotspace):
             mi = 2*1.67*10**(-27)
             return qcond/(T**(5/2)*kappa0-qcond*kappa0*T**(1/2)/(0.3*ni*np.sqrt(mi)))
         popt, pcov = curve_fit(fluxlimfunc, [SOLring1.ne,SOLring1.te,SOLring1.cond], np.gradient(SOLring1.te)/np.gradient(SOLring1.Spar),p0=[1000])
-        print(popt)
+
         ylabel = "s"+r'$_{f,||}$'+" (m)"
         # ylabel = "ne"
         if plotspace =="pol":
@@ -263,7 +258,9 @@ def scanThresholds(routine,plotspace):
 
         if routine == "GradB":
             if counter==0:
+
                 plt.plot((CSimple0/CSimple0[0]),(SHSIMPLE),label="Horizontal DLS",linestyle="--",color = "#F96E46",linewidth = 2)
+                
             else:
                 plt.plot((CSimple0/CSimple0[0]),(SHSIMPLE),label="Vertical DLS",linestyle="-",color = "#F9C846",linewidth = 2)
         if routine == "GradBAbsolute":
@@ -283,7 +280,7 @@ def scanThresholds(routine,plotspace):
     if routine=="Flaring":
         plt.legend()
         plt.ylabel(ylabel)
-        plt.xlabel(r"$C/C_{t}$")
+        plt.xlabel(r"$C_{f}/C_{t}$")
         plt.xlim([0.98,1.73])
         plt.tight_layout()
         if plotspace =="pol":
@@ -302,12 +299,12 @@ def scanThresholds(routine,plotspace):
             plt.savefig("Figures/CprofileBulgePar.png",dpi=400,bbox_inches='tight')
     
     if routine == "GradB":
-        print(percImpurity)
+
         ylabel = "s"+r'$_{f,pol}$'+" (m)"
         plt.ylabel(ylabel)
-        plt.xlabel(r"$C/C_{t}$")
+        plt.xlabel(r"$C_{f}/C_{t}$")
         plt.xlim([0.95,1.94])
-        plt.ylim([-0.01,0.43])
+        plt.ylim([-0.01,0.45])
         plt.legend(loc="lower right")
         plt.tight_layout()
         plt.savefig("Figures/CprofileGradB.png",dpi=400,bbox_inches='tight')
@@ -323,7 +320,7 @@ def scanThresholds(routine,plotspace):
     if routine == "GradBAbsolute":
         ylabel = "s"+r'$_{f,pol}$'+" (m)"
         plt.ylabel(ylabel)
-        plt.xlabel(r"$C$"+ " (W"+r"$^{-5/7}$"+"m"+r"$^{-11/7}$"+")")
+        plt.xlabel(r"$C_{f}$"+ " (W"+r"$^{-5/7}$"+"m"+r"$^{-11/7}$"+")")
         # plt.xlim([0.95,1.7])
         # plt.ylim([-0.01,0.37])
         plt.legend(loc="upper left")
@@ -354,17 +351,11 @@ def scanThresholds(routine,plotspace):
         plt.savefig("Figures/FieldBulge.png",dpi=400,bbox_inches='tight')
         plt.show()
 
-# plt.plot(np.transpose(coords))
-# plt.show()
-# print(datawall.read())
-# while '*** 3b. Data for additional surfaces' not in tline:
-#         tline = datawall.readlines(1)
-#         print(tline)
+
 
 routine = "Flaring"
-# routine = "FlaringAll"
-plotspace = "par"
-# plotspace = "pol"
+# plotspace = "par"
+plotspace = "pol"
 # routine = "GradB"
 # routine = "GradBAbsolute"
 # routine = "Different C"

@@ -8,14 +8,11 @@ import imageio as io
 from scipy import interpolate
 from scipy.integrate import quad,trapz, cumtrapz, odeint, solve_ivp
 from PIL import Image
-import cv2
-import glob
-import mpltools
-from mpltools import special
+
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import sys
 from UnpackSOLPS import unpackSOLPS
-from unpackConfigurations import unpackConfiguration
+
 from matplotlib.collections import LineCollection
 import re
 plt.rcParams["font.family"] = "serif"
@@ -72,7 +69,7 @@ def plotWALL(filewalls,axis):
 def plotGrids(routine):
     gridcolors = ["#53ba83","#059b9a","#095169","#0c0636","000000"]
     Files = []
-    Files = ["D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle30\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi80E-3"]
+    Files = ["balFiles\L1_Angle30\\fi80E-3"]
 
     C = []
     Bt = []
@@ -154,7 +151,7 @@ def plotGrids(routine):
 
     #plotting and layout specifics for flaring case
     if routine=="Flaring":
-        filewalls = "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle30\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi20E-3\\input.dat"
+        filewalls = "balFiles\L1_Angle30\\fi20E-3\\input.dat"
         plotWALL(filewalls,axs1)
         axs1.plot(np.transpose(R)[-1],np.transpose(Z)[-1],color="C1")
         axs1.scatter(R[:,0][10],Z[:,0][10],s=60,facecolors='none', edgecolors='r',linestyle="--")
@@ -172,8 +169,8 @@ def plotGrids(routine):
         # p2,=axs.plot(-10,-10,color="C1")
         axs1.annotate("pump", xy=(1.65, -0.73), xytext=(1.6, -0.55),arrowprops=dict(arrowstyle="->"))
         axs1.annotate("x-point", xy=(1, 0.02), xytext=(0.9, 0.16),arrowprops=dict(arrowstyle="->"))
-        axs1.annotate("west wall", xy=(1, 0), xytext=(0.88, -0.6))
-        axs1.annotate("east wall", xy=(1, 0), xytext=(1.45, -0.3))
+        axs1.annotate("inner wall", xy=(1, 0), xytext=(0.88, -0.6))
+        axs1.annotate("outer wall", xy=(1, 0), xytext=(1.45, -0.3))
         axs1.annotate("target", xy=(1.5, -0.85), xytext=(1.55, -0.9))
         axs1.annotate("a)", xy=(1.5, -0.85), xytext=(1.65, 0.15))
   

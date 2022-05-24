@@ -1,22 +1,9 @@
 from netCDF4 import Dataset
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-from natsort import natsorted
-import matplotlib.image as m
-import imageio as io
-from scipy import interpolate
-from scipy.integrate import quad,trapz, cumtrapz, odeint, solve_ivp
-from PIL import Image
-import cv2
-import glob
-import mpltools
-from mpltools import special
-import sys
-from UnpackSOLPS import unpackSOLPS
-from unpackConfigurations import unpackConfiguration
 from matplotlib.collections import LineCollection
 import re
+
 plt.rcParams["font.family"] = "serif"
 params = {'legend.fontsize': 'large',
          'axes.labelsize': 'large',
@@ -62,7 +49,7 @@ def plotWALL(filewalls,axis):
                 co[i] = float(co[i])/100
             coords.append(co)
             stype = datawall.readlines(1)
-            axis.plot([co[0],co[3]],[co[1],co[4]],color="C1")
+            axis.plot([co[0],co[3]],[co[1],co[4]],color="#635459")
 
 
 
@@ -71,31 +58,32 @@ def plotGrids(routine):
     Files = []
 
     if routine =="Flux Expansion":
-        Files = ["D:\\my stuff\\PhD\\SOLPSRUNS\\isolatedBox\\L1_Angle90\\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb_v0BC\\fi17E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle30\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi20E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle11\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi65E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi70E-3"
+        Files = ["balFiles\\L1_Angle90\\fi17E-3",
+        "balFiles\L1_Angle30\\fi20E-3",
+        "balFiles\L1_Angle11\\fi65E-3",
+        "balFiles\L1_Angle0\\fi70E-3"
         ]
     if routine =="Connection Length":
-        Files = ["D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L0.75Angle0\\fi100E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi70E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1.25Angle0\\fi75E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1.50Angle0\\fi55E-3",
+        Files = ["balFiles\L0.75Angle0\\fi100E-3",
+        "balFiles\L1_Angle0\\fi70E-3",
+        "balFiles\L1.25Angle0\\fi75E-3",
+        "balFiles\L1.50Angle0\\fi55E-3",
         ]
     if routine =="Flaring":
         Files = [
         # "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentNoBulge_Lpar20\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi135E-3",
         # "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi60E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentNoBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb\\fi25E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb\\fi30E-3",
+        "balFiles\\NoFlare\\fi135E-3",
+        "balFiles\\Flare\\fi135E-3",
+        # "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb\\fi30E-3",
 
         ]
     if routine =="Kink":
         Files = [
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\KinkAngle90Angle0\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi9E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\KinkAngle67Angle23\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi10E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\KinkAngle23Angle67\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi10E-3",
-        "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\KinkAngle0Angle90\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi9E-3",
+        "balFiles\KinkAngle90Angle0\\fi9E-3",
+        "balFiles\KinkAngle67Angle23\\fi10E-3",
+        "balFiles\KinkAngle23Angle67\\fi10E-3",
+        "balFiles\KinkAngle0Angle90\\fi9E-3",
         ]   
     if routine =="Stability":
         Files = ["D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle-10\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi70E-3"]   
@@ -231,11 +219,11 @@ def plotGrids(routine):
 
     #plotting and layout specifics for flaring case
     if routine=="Flaring":
-        filewalls = "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentNoBulge_Lpar20\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi135E-3\input.dat"
-        filewalls = "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentNoBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb\\fi25E-3\input.dat"
+        filewalls = "C:\\Users\\cyd cowley\\Desktop\\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentNoBulge_Lpar20\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi135E-3\input.dat"
+        # filewalls = "C:\\Users\\cyd cowley\\Desktop\\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentNoBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb\\fi25E-3\input.dat"
         plotWALL(filewalls,axs[0])
-        filewalls = "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi60E-3\input.dat"
-        filewalls = "D:\my stuff\PhD\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb\\fi20E-3\input.dat"
+        filewalls = "C:\\Users\\cyd cowley\\Desktop\\PhD\\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20\ImpurityScanqpll5E7ne1E19_Ncooling_Recomb\\fi60E-3\input.dat"
+        # filewalls = "C:\\Users\\cyd cowley\\Desktop\\PhD\\SOLPSRUNS\isolatedBox\L1_Angle0BulgeExperimentBulge_Lpar20_TightGrid\ImpurityScanqpll5E7ne1.5E19_Ncooling_Recomb\\fi20E-3\input.dat"
         plotWALL(filewalls,axs[1])
         for i in range(len(Files)):
             axs[i].set_xlim([0.5,1.55])
@@ -243,11 +231,11 @@ def plotGrids(routine):
             axs[i].xaxis.set_ticks(np.arange(1, 1.2, 0.249))
         p0,=axs[0].plot(-10,-10,color=gridcolors[0])
         p1,=axs[0].plot(-10,-10,color=gridcolors[3])
-        p2,=axs[0].plot(-10,-10,color="C1")
+        p2,=axs[0].plot(-10,-10,color="#635459")
         axs[0].set_ylabel("Z (m)")
         axs[0].set_xlabel("R (m)",x=1)  
         fig.tight_layout(pad=.0)
-        plt.legend([p0,p1,p2],["Straightdown","Flared","Wall Surface"],bbox_to_anchor=(0.8, 0.9))
+        plt.legend([p0,p1,p2],["Straightdown","Flared","Wall and pump"],bbox_to_anchor=(0.8, 0.9))
         plt.savefig("Figures/gridBulge.png",dpi=400,bbox_inches='tight')
     if routine=="PSI":
         for i in range(4):
@@ -286,5 +274,5 @@ routine = "Flaring"
 # routine = "Connection Length"
 # routine = "Kink"
 # routine = "Stability"
-routine = "PSI"
+
 plotGrids(routine)

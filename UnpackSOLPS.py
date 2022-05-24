@@ -6,11 +6,9 @@ import matplotlib.image as m
 import imageio as io
 from scipy import interpolate
 from PIL import Image
-import cv2
 import glob
 from scipy.integrate import trapz
-import mpltools
-from mpltools import special
+
 import sys
 sys.path.append('d:\\my stuff\\PhD\\DLS-model\\')
 from AnalyticCoolingCurves import LfuncN
@@ -39,13 +37,15 @@ def determineC0(Spar,C):
     return index0
 
 class SOLring:
-    def __init__(self,Spar,Spol,Sdiff,te,ti,cond,ne,ni,n0,B,Bpol,qf,n0rad,ionisLoss,recombLoss,molecularloss,divuloss,conv,radTrans,FlowVelocity,recombSource,ionisSource,CXmomLoss):
+    def __init__(self,Spar,Spol,Sdiff,ParArea,te,ti,cond,condI,ne,ni,n0,B,Bpol,qf,n0rad,ionisLoss,recombLoss,molecularloss,divuloss,conv,radTrans,FlowVelocity,recombSource,ionisSource,CXmomLoss):
         self.Spar = Spar # parallel distance, [m]
         self.Spol = Spol # poloidal distance, [m]
         self.Sdiff = Sdiff # change in parallel distance betwen adjcent grids, [m]
+        self.ParArea = ParArea # parallel area
         self.te = te # electron temperature, [eV]
         self.ti = ti #ion temperature [eV]
-        self.cond = cond # conducted electron heat flux, [Wm^{-2}]
+        self.cond = cond # conducted electron heat flux density, [Wm^{-2}]
+        self.condI = condI # conducted ion heat flux density, [Wm^{-2}]
         self.ne = ne # electron density, [m^{-3}]
         self.ni = ni # ion density, [m^{-3}]
         self.n0 = n0
@@ -58,7 +58,7 @@ class SOLring:
         self.molecularloss = molecularloss # molecular heat flux loss
         self.divuloss = divuloss # heat flux loss due to grad v
         self.conv = conv # convective heat flux, wm^-2
-        self.radTrans = radTrans-radTrans[-1] # heat flux loss due to radial transport
+        self.radTrans = radTrans # heat flux loss due to radial transport
         self.FlowVelocity = FlowVelocity 
         self.recombSource = recombSource
         self.ionisSource = ionisSource
@@ -276,6 +276,51 @@ class SOLring:
         
         return([Calc0,Calc1,Calc2,Calc3,Calc4,Calc5])
 
+    def returnCalculationsC(self,frontpos):
+        #0 is most theoretical
+        Tinterp = interpolate.interp1d(self.te,self.Spar,kind='cubic')
+        Lfunc = []
+        for t in self.te:
+            Lfunc.append(LfuncN(t))
+
+        kappa = np.polyfit(self.te[1:]**(5/2)*np.diff(self.te)/np.diff(self.Spar), self.cond[1:], 1)[0]
+        kappa0 = 2600
+        # plt.plot(kappa0*self.te[1:]**(5/2)*np.diff(self.te)/np.diff(self.Spar),self.cond[1:],color="C0")
+
+        # kappa = 1000
+        FieldInterp = interpolate.interp1d(self.Spar, self.B,kind='cubic',bounds_error=False, fill_value=(self.B[0],self.B[-1]))
+
+        Coldindex = 0
+        Calc0 = (self.cond[-1]**2/2)*(FieldInterp(frontpos)/self.B[-1])**2
+        
+        int0 = kappa0*self.te[-1]**2*self.ne[-1]**2*trapz(Lfunc[Coldindex:]*self.te[Coldindex:]**(1/2),self.te[Coldindex:])
+        
+        Calc0 = Calc0/int0
+        fi = Calc0
+        sqrtfi = np.sqrt(Calc0)
+        Calc0 = np.sqrt(Calc0)
+        
+        Calc0 = Calc0*self.ne[-1]
+        Calc0 = Calc0/(self.cond[-1])**(5/7)
+        #calculation 1 adds real tb
+        densityTF = self.te[-1]**2
+        densityTF = densityTF*self.ne[-1]**2
+        densityTF = np.sqrt(densityTF/(self.te**2))
+
+        int1 =self.B[-1]**2*trapz(2*self.cond[Coldindex:]*densityTF[Coldindex:]**2*Lfunc[Coldindex:]*fi/self.B[Coldindex:]**2,self.Spar[Coldindex:])
+        q1 = np.sqrt(int1)
+
+        Calc1 = sqrtfi*self.ne[-1]*(q1)**(-5/7)
+        #Calculation 2 uses the real Tu
+
+        int2 =self.B[-1]**2*trapz(2*self.cond[Coldindex:]*self.ne[Coldindex:]**2*Lfunc[Coldindex:]*fi/self.B[Coldindex:]**2,self.Spar[Coldindex:])
+        q2 = np.sqrt(int2)
+        Calc2 = sqrtfi*self.ne[-1]*(int2)**(-5/7)
+        # Calculation 3 uses correct integral and target heat
+
+
+        return([Calc0,Calc1,Calc2])
+
 def unpack2d(rootgrp):
     """this function unpacks the raw balance file into a dictionary of 2d arrays containing important quantities"""
     bb = rootgrp['bb']
@@ -311,6 +356,9 @@ def unpack2d(rootgrp):
     #Conductive electron heat flux (Wm^{-2}):
     fhe_cond = rootgrp['fhe_cond'][0]/quantities2d["Area"]
     quantities2d["cond"] = fhe_cond
+    #Conductive ion heat flux (Wm^{-2}):
+    fhi_cond = rootgrp['fhi_cond'][0]/quantities2d["Area"]
+    quantities2d["condI"] = fhi_cond
     #electron temperature (eV):
     te = np.array(rootgrp["te"])
     quantities2d["te"] = te/(1.60*10**(-19))
@@ -352,9 +400,9 @@ def unpack2d(rootgrp):
     quantities2d["Divuloss"] = np.array(rootgrp["b2sihs_divua_bal"])+np.array(rootgrp["b2sihs_divue_bal"])
 
     quantities2d["radialHeatFlux"] = (np.array(rootgrp['fhe_52'])+np.array(rootgrp['fhe_32'])+np.array(rootgrp['fhe_thermj']) + np.array(rootgrp['fhe_cond']) + np.array(rootgrp['fhe_dia']) + np.array(rootgrp['fhe_ecrb']) + 
-    np.array(rootgrp['fhe_strange'])+np.array(rootgrp['fhe_pschused'])+np.array(rootgrp['fhi_32'])+np.array(rootgrp['fhi_52'])+np.array(rootgrp['fhi_cond'])+np.array(rootgrp['fhi_dia'])+np.array(rootgrp['fhi_ecrb'])+np.array(rootgrp['fhi_strange'])+
-    np.array(rootgrp['fhi_pschused'])+np.array(rootgrp['fhi_inert'])+np.array(rootgrp['fhi_vispar'])+np.array(rootgrp['fhi_anml'])+np.array(rootgrp['fhi_kevis']))[1]#/(2*np.array(hx)*np.sqrt(quantities2d["Area"]))
-    
+    np.array(rootgrp['fhe_strange'])+np.array(rootgrp['fhe_pschused']))[1]#+np.array(rootgrp['fhi_32'])+np.array(rootgrp['fhi_52'])+np.array(rootgrp['fhi_cond'])+np.array(rootgrp['fhi_dia'])+np.array(rootgrp['fhi_ecrb'])+np.array(rootgrp['fhi_strange'])+
+    #np.array(rootgrp['fhi_pschused'])+np.array(rootgrp['fhi_inert'])+np.array(rootgrp['fhi_vispar'])+np.array(rootgrp['fhi_anml'])+np.array(rootgrp['fhi_kevis']))[1]
+
     #charge exchange momentum loss
     # print(rootgrp)
     quantities2d["CXmomLoss"] = np.array(rootgrp['b2stcx_smq_bal'][0])
@@ -372,9 +420,11 @@ def unpackSOLPS(fileName,reverse,ring):
     SOLring1 = SOLring(Spar= np.cumsum(quantities2d["sdiff"][ring][::reverse][1:Xpoint]),
     Spol= np.cumsum(quantities2d["sdiffpol"][ring][::reverse][1:Xpoint]),
     Sdiff = quantities2d["sdiff"][ring][::reverse][1:Xpoint],
+    ParArea = quantities2d["Area"][ring][::reverse][1:Xpoint],
     te = quantities2d["te"][ring][::reverse][1:Xpoint],
     ti = quantities2d["ti"][ring][::reverse][1:Xpoint],
     cond = -1*reverse*quantities2d["cond"][ring][::reverse][1:Xpoint],
+    condI = -1*reverse*quantities2d["condI"][ring][::reverse][1:Xpoint],
     ne = quantities2d["ne"][ring][::reverse][1:Xpoint],
     ni = quantities2d["ni"][ring][::reverse][1:Xpoint],
     n0 = quantities2d["n0"][ring][::reverse][1:Xpoint],
@@ -387,7 +437,7 @@ def unpackSOLPS(fileName,reverse,ring):
     molecularloss = (quantities2d["molecularloss"]/quantities2d["V"])[ring][::reverse][1:Xpoint],
     divuloss = (quantities2d["Divuloss"]/quantities2d["V"])[ring][::reverse][1:Xpoint],
     conv = -1*reverse*quantities2d["conv"][ring][::reverse][1:Xpoint],
-    radTrans=(quantities2d["radialHeatFlux"])[ring][::reverse][1:Xpoint],
+    radTrans=(quantities2d["radialHeatFlux"]/quantities2d["V"])[ring][::reverse][1:Xpoint],
     FlowVelocity = (quantities2d["vfluid"])[ring][::reverse][1:Xpoint],
     recombSource = (quantities2d["recombSource"])[ring][::reverse][1:Xpoint],
     ionisSource = (quantities2d["ionisSource"])[ring][::reverse][1:Xpoint],
